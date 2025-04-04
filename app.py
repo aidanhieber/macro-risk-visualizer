@@ -29,6 +29,7 @@ else:
     show_spread = st.checkbox("Show Credit Spreads", value=True)
     show_returns = st.checkbox("Show S&P 500 Returns (Separate Chart)", value=True)
     show_signals = st.checkbox("Show Predictive Signals", value=True)
+    show_backtest = st.checkbox("Show Backtesting Returns", value=True)
 
     if not df_filtered.empty:
         # --- PRIMARY MACRO-INDICATOR CHART ---
@@ -124,5 +125,69 @@ else:
             )
 
             st.plotly_chart(fig_returns, use_container_width=True)
+
+        # --- BACKTESTING STRATEGY CHART ---
+        if show_backtest:
+            df_filtered['Strategy Return'] = 0
+            df_filtered['Cumulative Strategy Return'] = 1
+
+            # Loop through each row and apply strategy
+            for i in range(1, len(df_filtered)):
+                if df_filtered['Signal'].iloc[i]:  # If there's a signal (True)
+                    # Short the market, so take the inverse return
+                    df_filtered['Strategy Return'].iloc[i] = -df_filtered['S&P 500 Returns'].iloc[
+                        i] / 100  # Assuming S&P returns are in percentage
+                else:
+                    # Long the market, so take the same return as the market
+                    df_filtered['Strategy Return'].iloc[i] = df_filtered['S&P 500 Returns'].iloc[i] / 100
+
+                # Cumulative return: update for each step
+                df_filtered['Cumulative Strategy Return'].iloc[i] = (1 + df_filtered['Strategy Return'].iloc[i]) * \
+                                                                    df_filtered['Cumulative Strategy Return'].iloc[
+                                                                        i - 1]
+
+            # Cumulative returns for the strategy
+            fig_backtest = go.Figure()
+
+            # Plot the strategy returns
+            fig_backtest.add_trace(go.Scatter(
+                x=df_filtered.index,
+                y=df_filtered['Cumulative Strategy Return'],
+                mode='lines',
+                name="Strategy Cumulative Return"
+            ))
+
+            # Cumulative returns for Buy & Hold (S&P 500)
+            fig_backtest.add_trace(go.Scatter(
+                x=df_filtered.index,
+                y=(1 + df_filtered['S&P 500 Returns'] / 100).cumprod(),
+                mode='lines',
+                name="Buy & Hold (S&P 500)"
+            ))
+
+            fig_backtest.update_layout(
+                title="Strategy vs Buy & Hold Cumulative Returns",
+                xaxis_title="Date",
+                yaxis_title="Cumulative Return",
+                showlegend=True
+            )
+
+            # Summary box with concise description above the chart
+            st.markdown("""
+            **Backtesting Strategy:**
+
+            - **Signal Criteria**: The strategy generates a signal based on:
+              - Credit spread increases > 10% month-over-month.
+              - Consumer sentiment drops > 10% month-over-month **or** falls below 70.
+
+            - **Execution**: The strategy **shorts** the market when the signal is `True` and **goes long** when the signal is `False`.
+
+            - **Objective**: Compare the cumulative returns of the strategy against a simple **buy-and-hold** approach with the S&P 500 index.
+            """)
+
+            st.plotly_chart(fig_backtest, use_container_width=True)
+
     else:
         st.warning("No data available in the selected date range. Please adjust the dates.")
+
+
