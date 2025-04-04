@@ -1,7 +1,6 @@
-﻿pandas
+﻿streamlit
+plotly
+pandas
 numpy
-yfinance
 fredapi
 python-dotenv
-matplotlib
-streamlit
